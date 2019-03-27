@@ -1,28 +1,27 @@
 CREATE OR REPLACE FUNCTION get_default_owner() RETURNS "user" AS $$
-    
-    DECLARE
-        nbUserDefault "user"%rowtype;
-        DefaultName varchar(500) := 'Default owner';
-    BESING
-    
-        SELECT * INTO nbUserDefault
-        FROM "user"
-        WHERE DefaultName := 'Default owner';
-    
-        IF not found THEN
-            RETURN 	"user";
-        ELSE
-            INSERT INTO "user" (id, username)
-            VALUES (nextval('id-generator'), "Default owner");
-            
-            SELECT * INTO nbUserDefault
-            FROM "user"
-            WHERE DefaultName := 'Default owner';
-            
-            RETURN "user";
-        END IF
-    
-    
-        RETURN username
+	DECLARE
+		defaultOwner "user"%ROWTYPE;
+		defaultOwnerUsername VARCHAR(500) := 'Default Owner';
+	BEGIN
+	    SELECT * INTO defaultOwner FROM "user" WHERE username = defaultOwnerUsername;
+    	IF not found THEN
+        	INSERT INTO "user" VALUES (nextval('id_generator'),defaultOwnerUsername);
+        	SELECT * INTO defaultOwner FROM "user" WHERE username = defaultOwnerUsername;
+    	END IF;
+    	RETURN defaultOwner;
     END
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE PLPGSQL;
+
+
+CREATE OR REPLACE FUNCTION fix_activities_without_owner() RETURNS SETOF activity AS $$
+    DECLARE
+        defaultOwner "user"%ROWTYPE;
+    BEGIN
+        defaultOwner := get_default_owner();
+        RETURN QUERY
+        UPDATE activity
+        SET owner_id = defaultOwner.id
+        WHERE owner_id is null
+        RETURNING *;
+    END
+$$ LANGUAGE PLPGSQL;
